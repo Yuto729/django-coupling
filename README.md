@@ -30,7 +30,23 @@ balance = (1 - |strength - (1 - distance)|) * (1 - volatility * strength)
 ### Distance & Django layers
 Layer order `views > serializers > services > models`. A higher layer importing
 a lower one (`views → services → models`) is the expected direction; the reverse
-(`models → views`) is flagged as a **layer violation** (critical).
+(`models → views`) is flagged as a **layer violation** (critical). Layers with
+the *same* rank are treated as same-layer (no violation either way).
+
+The ranking is the project's call — override it in `.coupling.toml` (discovered
+by walking up from the analysis path):
+
+```toml
+[layers]
+# name = rank (smaller = higher layer). Equal ranks => same-layer.
+views = 0
+serializers = 2   # same rank as services: services <-> serializers is NOT a violation
+services = 2
+models = 3
+```
+
+> On smbkikan-back, putting `serializers` and `services` at the same rank drops
+> critical violations from 74 to 19 — the remaining 19 are genuine reverse-flow.
 
 ### Volatility
 Commits touching the target file in a recent window (default 6 months):
@@ -51,16 +67,18 @@ Zero runtime dependencies (stdlib `ast` + `git`).
 This is an MVP (v0). It intentionally does **not** do:
 
 - `--web` visualization, `--baseline` diff gates, `--impact` / `--trace`
-- `.coupling.toml` config (layer ranking is currently hard-coded)
 - Django ForeignKey / signal coupling (import graph only)
+
+`.coupling.toml` currently supports only `[layers]`; other thresholds
+(`max_dependencies`, etc.) remain hard-coded.
 
 Heuristic limits worth knowing:
 
 - Strength via instances is undercounted — `Budget._x` is detected as intrusive,
   but `b = Budget(); b._x` is not (no data-flow analysis).
 - `services → serializers` is flagged as a violation under the default ranking;
-  whether that is "wrong" depends on your architecture. Configurable ranking is
-  a v1 item.
+  whether that is "wrong" depends on your architecture — override via
+  `.coupling.toml` `[layers]`.
 
 Results are guidance, not verdicts — a starting point for human review.
 

@@ -7,8 +7,8 @@ name = "django-coupling"
 version = "0.1.0"
 description = "Coupling analysis for Django/Python projects — Strength x Distance x Volatility (a la cargo-coupling)"
 readme = "README.md"
-requires-python = ">=3.10"
-# v0 goal: zero runtime dependencies. Pure stdlib (ast, subprocess, json, argparse).
+requires-python = ">=3.11"
+# v0 goal: zero runtime dependencies. Pure stdlib (ast, subprocess, json, argparse, tomllib).
 dependencies = []
 
 [project.scripts]

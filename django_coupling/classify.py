@@ -32,13 +32,20 @@ def strength_from_usages(usage_kinds) -> tuple[float, str]:
 # Django layer ranks: smaller rank = higher layer. A higher layer importing a
 # lower one (views -> services -> models) is the *expected* direction. The
 # reverse (models -> views) is an architectural violation.
-LAYER_RANK = {
+#
+# These are defaults; a project can override them via `[layers]` in
+# .coupling.toml (see config.py). e.g. set serializers and services to the same
+# rank so `services -> serializers` reads as same-layer rather than a violation.
+DEFAULT_LAYER_RANK = {
     "views": 0,
     "serializers": 1,
     "services": 2,
     "selectors": 2,
     "models": 3,
 }
+
+# Backwards-compatible alias.
+LAYER_RANK = DEFAULT_LAYER_RANK
 
 DISTANCE = {
     "same_package": 0.25,
@@ -58,16 +65,23 @@ def _package(module: str) -> str:
     return ".".join(parts[:-1]) if len(parts) > 1 else module
 
 
-def _layer(module: str) -> str | None:
+def _layer(module: str, layer_rank: dict) -> str | None:
     """The Django layer of a module, e.g. api.services.budget -> 'services'."""
     parts = _split(module)
-    if len(parts) >= 2 and parts[1] in LAYER_RANK:
+    if len(parts) >= 2 and parts[1] in layer_rank:
         return parts[1]
     return None
 
 
-def distance_score(src: str, tgt: str) -> tuple[float, str, bool]:
-    """Return (score, label, is_layer_violation) for an edge src -> tgt."""
+def distance_score(src: str, tgt: str, layer_rank: dict | None = None
+                   ) -> tuple[float, str, bool]:
+    """Return (score, label, is_layer_violation) for an edge src -> tgt.
+
+    `layer_rank` maps a layer name to a rank (smaller = higher layer); defaults
+    to DEFAULT_LAYER_RANK and is overridable via .coupling.toml.
+    """
+    if layer_rank is None:
+        layer_rank = DEFAULT_LAYER_RANK
     src_parts, tgt_parts = _split(src), _split(tgt)
 
     # Different top-level package -> maximally distant.
@@ -78,12 +92,12 @@ def distance_score(src: str, tgt: str) -> tuple[float, str, bool]:
     if _package(src) == _package(tgt):
         return DISTANCE["same_package"], "same_package", False
 
-    src_layer, tgt_layer = _layer(src), _layer(tgt)
+    src_layer, tgt_layer = _layer(src, layer_rank), _layer(tgt, layer_rank)
     if src_layer is not None and tgt_layer is not None:
-        if src_layer == tgt_layer:
+        if layer_rank[src_layer] == layer_rank[tgt_layer]:
             return DISTANCE["same_layer"], "same_layer", False
         # Lower rank number = higher layer. Higher importing lower = forward.
-        if LAYER_RANK[src_layer] < LAYER_RANK[tgt_layer]:
+        if layer_rank[src_layer] < layer_rank[tgt_layer]:
             return DISTANCE["forward_layer"], "forward_layer", False
         # Lower layer importing a higher one = architectural reverse-flow.
         return DISTANCE["layer_violation"], "layer_violation", True

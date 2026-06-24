@@ -7,6 +7,7 @@ import os
 import sys
 
 from .classify import distance_score, volatility_score
+from .config import load_layer_rank
 from .parser import build_graph
 from .score import balance_score, detect_issue, grade
 from .volatility import commit_counts
@@ -17,11 +18,12 @@ def analyze(target: str, since: str = "6 months ago") -> dict:
     abspaths = {mod: os.path.abspath(path) for mod, path in modules.items()}
     counts = commit_counts(target, since=since)
     git_available = bool(counts)
+    layer_rank, config_path = load_layer_rank(target)
 
     results = []
     for e in edges:
         src, tgt, strength = e["src"], e["tgt"], e["strength"]
-        dist, dist_label, is_violation = distance_score(src, tgt)
+        dist, dist_label, is_violation = distance_score(src, tgt, layer_rank)
         n_commits = counts.get(abspaths.get(tgt, ""), 0)
         vol, vol_label = volatility_score(n_commits)
         bal = balance_score(strength, dist, vol)
@@ -41,6 +43,8 @@ def analyze(target: str, since: str = "6 months ago") -> dict:
     highs = sum(1 for r in results if r["severity"] == "high")
     return {
         "target": os.path.abspath(target),
+        "config": config_path,
+        "layer_rank": layer_rank,
         "git_available": git_available,
         "module_count": len(modules),
         "edge_count": len(results),
@@ -61,6 +65,10 @@ def _render_text(rep: dict, top: int) -> str:
                  f"   critical: {rep['criticals']}   high: {rep['highs']}")
     if not rep["git_available"]:
         lines.append("(!) git history unavailable — volatility defaulted to 0")
+    if rep.get("config"):
+        lines.append(f"config: {rep['config']}  layers={rep['layer_rank']}")
+    else:
+        lines.append(f"config: (defaults)  layers={rep['layer_rank']}")
     lines.append("")
 
     issues = [e for e in rep["edges"] if e["severity"]]
