@@ -52,6 +52,19 @@ models = 3
 Commits touching the target file in a recent window (default 6 months):
 0–2 → low (0.0), 3–10 → medium (0.5), 11+ → high (1.0).
 
+Git is a noisier sensor in the AI-coding era (one commit can touch many
+unrelated files), so the signal is hardened by combining mitigations:
+
+- `--no-merges` (merges aren't real edits)
+- commits touching more than `--max-commit-files` (default 30) are **excluded** —
+  a single N-file commit would otherwise inflate N files at once
+- the tool **self-reports confidence** (`high`/`medium`/`low`) from the repo's
+  own commit-size distribution, instead of pretending the signal is always good:
+
+  ```
+  volatility confidence: high  (median 2 files/commit, p90 7, 3/923 bulk commits >30 excluded)
+  ```
+
 ## Usage
 
 ```bash

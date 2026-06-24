@@ -13,11 +13,11 @@ from .score import balance_score, detect_issue, grade
 from .volatility import commit_counts
 
 
-def analyze(target: str, since: str = "6 months ago") -> dict:
+def analyze(target: str, since: str = "6 months ago", max_commit_files: int = 30) -> dict:
     modules, edges = build_graph(target)
     abspaths = {mod: os.path.abspath(path) for mod, path in modules.items()}
-    counts = commit_counts(target, since=since)
-    git_available = bool(counts)
+    counts, vol_diag = commit_counts(target, since=since, max_files=max_commit_files)
+    git_available = vol_diag is not None
     layer_rank, config_path = load_layer_rank(target)
 
     results = []
@@ -46,6 +46,7 @@ def analyze(target: str, since: str = "6 months ago") -> dict:
         "config": config_path,
         "layer_rank": layer_rank,
         "git_available": git_available,
+        "volatility_diagnostics": vol_diag,
         "module_count": len(modules),
         "edge_count": len(results),
         "avg_balance": avg,
@@ -65,6 +66,14 @@ def _render_text(rep: dict, top: int) -> str:
                  f"   critical: {rep['criticals']}   high: {rep['highs']}")
     if not rep["git_available"]:
         lines.append("(!) git history unavailable — volatility defaulted to 0")
+    else:
+        d = rep["volatility_diagnostics"]
+        lines.append(
+            f"volatility confidence: {d['confidence']}  "
+            f"(median {d['median_files']} files/commit, p90 {d['p90_files']}, "
+            f"{d['excluded_bulk']}/{d['commits']} bulk commits >"
+            f"{d['max_commit_files']} excluded)"
+        )
     if rep.get("config"):
         lines.append(f"config: {rep['config']}  layers={rep['layer_rank']}")
     else:
@@ -100,13 +109,15 @@ def main(argv=None) -> int:
     ap.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     ap.add_argument("--top", type=int, default=15, help="how many rows to show (default 15)")
     ap.add_argument("--since", default="6 months ago", help="git window for volatility")
+    ap.add_argument("--max-commit-files", type=int, default=30,
+                    help="exclude commits touching more than N files from volatility (default 30)")
     args = ap.parse_args(argv)
 
     if not os.path.isdir(args.path):
         print(f"error: not a directory: {args.path}", file=sys.stderr)
         return 2
 
-    rep = analyze(args.path, since=args.since)
+    rep = analyze(args.path, since=args.since, max_commit_files=args.max_commit_files)
     if args.json:
         print(json.dumps(rep, indent=2, ensure_ascii=False))
     else:
