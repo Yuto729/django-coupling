@@ -65,6 +65,30 @@ unrelated files), so the signal is hardened by combining mitigations:
   volatility confidence: high  (median 2 files/commit, p90 7, 3/923 bulk commits >30 excluded)
   ```
 
+## God-class detection (class granularity)
+
+Module-level coupling can't see a huge class inside one file, so a separate pass
+flags **God-class candidates** at `ast.ClassDef` granularity. The signal is
+**cohesion, not size** (size can't tell "large but cohesive" from "does
+everything"):
+
+- **LCOM4** — methods are graph nodes, linked when they touch a common `self.*`
+  member (shared field, or one calling the other). Connected components are
+  size-independent: a cohesive class is 1 component at any size; a God class
+  splits into ≥2 (literally several classes under one name).
+- Candidacy gates (precision over recall — false accusations erode trust):
+  - class must have ≥1 instance field (LCOM is undefined without shared state;
+    drops Django Admin/FilterSet hooks and pure-function bags)
+  - excludes the all-singleton case (stateless method bag, a different smell)
+  - tests excluded (test→internal coupling is expected)
+- `fan_out` (distinct imports the class touches) is a secondary severity signal.
+
+Output is **candidates for review, never a verdict** — facades, DTOs and rich
+Django models can score high legitimately. Deliberately git-free (co-change is
+too polluted by large AI-era commits to trust here).
+
+> On smbkikan-back the gates take it from 314 raw → 34 actionable candidates.
+
 ## Usage
 
 ```bash
@@ -81,6 +105,8 @@ This is an MVP (v0). It intentionally does **not** do:
 
 - `--web` visualization, `--baseline` diff gates, `--impact` / `--trace`
 - Django ForeignKey / signal coupling (import graph only)
+- God-class thresholds (`--god-min-methods`, field/fan-out gates) are heuristic;
+  framework-heavy classes (ViewSets, Admin) may still appear as candidates
 
 `.coupling.toml` currently supports only `[layers]`; other thresholds
 (`max_dependencies`, etc.) remain hard-coded.

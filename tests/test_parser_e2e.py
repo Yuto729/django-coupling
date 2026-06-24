@@ -62,6 +62,22 @@ def test_build_graph_resolves_and_scores_strength(tmp_path):
     assert e is not None and e["strength"] == 0.75
 
 
+def test_tests_excluded_by_default(tmp_path):
+    target = _make_project(tmp_path)
+    # add a test file and a tests/ package
+    (tmp_path / "proj" / "api" / "test_budget.py").write_text("X = 1\n")
+    tdir = tmp_path / "proj" / "api" / "tests"
+    tdir.mkdir()
+    (tdir / "__init__.py").write_text("")
+    (tdir / "thing.py").write_text("Y = 1\n")
+
+    modules, _ = build_graph(target)
+    assert "api.test_budget" not in modules
+    assert "api.tests.thing" not in modules
+    # production modules still present
+    assert "api.services.budget" in modules
+
+
 def test_analyze_flags_layer_violation(tmp_path):
     target = _make_project(tmp_path)
     rep = analyze(target)

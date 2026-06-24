@@ -8,12 +8,14 @@ import sys
 
 from .classify import distance_score, volatility_score
 from .config import load_layer_rank
+from .godclass import DEFAULT_MIN_METHODS, find_god_classes
 from .parser import build_graph
 from .score import balance_score, detect_issue, grade
 from .volatility import commit_counts
 
 
-def analyze(target: str, since: str = "6 months ago", max_commit_files: int = 30) -> dict:
+def analyze(target: str, since: str = "6 months ago", max_commit_files: int = 30,
+            god_min_methods: int = DEFAULT_MIN_METHODS) -> dict:
     modules, edges = build_graph(target)
     abspaths = {mod: os.path.abspath(path) for mod, path in modules.items()}
     counts, vol_diag = commit_counts(target, since=since, max_files=max_commit_files)
@@ -41,6 +43,7 @@ def analyze(target: str, since: str = "6 months ago", max_commit_files: int = 30
     avg = round(sum(r["balance"] for r in results) / len(results), 4) if results else 1.0
     criticals = sum(1 for r in results if r["severity"] == "critical")
     highs = sum(1 for r in results if r["severity"] == "high")
+    god = find_god_classes(target, min_methods=god_min_methods)
     return {
         "target": os.path.abspath(target),
         "config": config_path,
@@ -54,6 +57,7 @@ def analyze(target: str, since: str = "6 months ago", max_commit_files: int = 30
         "criticals": criticals,
         "highs": highs,
         "edges": results,
+        "god_candidates": god,
     }
 
 
@@ -91,6 +95,16 @@ def _render_text(rep: dict, top: int) -> str:
             )
         lines.append("")
 
+    god = rep.get("god_candidates", [])
+    if god:
+        lines.append(f"God class candidates ({len(god)}, cohesion-based — review, not a verdict):")
+        for g in god[:top]:
+            lines.append(
+                f"  [{g['severity']:<6}] lcom4={g['lcom4']} methods={g['methods']}"
+                f" fields={g['fields']} fan_out={g['fan_out']}  {g['class']}"
+            )
+        lines.append("")
+
     worst = sorted(rep["edges"], key=lambda e: e["balance"])[:top]
     lines.append(f"Hotspots (lowest balance, top {top}):")
     for e in worst:
@@ -111,13 +125,16 @@ def main(argv=None) -> int:
     ap.add_argument("--since", default="6 months ago", help="git window for volatility")
     ap.add_argument("--max-commit-files", type=int, default=30,
                     help="exclude commits touching more than N files from volatility (default 30)")
+    ap.add_argument("--god-min-methods", type=int, default=4,
+                    help="min instance methods for a class to be a God candidate (default 4)")
     args = ap.parse_args(argv)
 
     if not os.path.isdir(args.path):
         print(f"error: not a directory: {args.path}", file=sys.stderr)
         return 2
 
-    rep = analyze(args.path, since=args.since, max_commit_files=args.max_commit_files)
+    rep = analyze(args.path, since=args.since, max_commit_files=args.max_commit_files,
+                  god_min_methods=args.god_min_methods)
     if args.json:
         print(json.dumps(rep, indent=2, ensure_ascii=False))
     else:

@@ -37,18 +37,28 @@ def module_name(path: str, root: str) -> str:
     return ".".join(parts)
 
 
-def iter_py_files(target: str):
+def _is_test_file(fn: str) -> bool:
+    return (fn.startswith("test_") or fn.endswith("_test.py")
+            or fn in {"conftest.py", "tests.py"})
+
+
+def iter_py_files(target: str, include_tests: bool = False):
     for dirpath, dirnames, filenames in os.walk(target):
-        # skip virtualenvs, migrations, caches, hidden dirs
+        # skip virtualenvs, migrations, caches, hidden dirs (and tests by default,
+        # matching cargo-coupling: test->internal coupling is expected, not a smell)
+        skip_dirs = {"__pycache__", "migrations", "node_modules", "venv", ".venv"}
+        if not include_tests:
+            skip_dirs |= {"tests", "test"}
         dirnames[:] = [
             d for d in dirnames
-            if d not in {"__pycache__", "migrations", "node_modules"}
-            and not d.startswith(".")
-            and d not in {"venv", ".venv"}
+            if d not in skip_dirs and not d.startswith(".")
         ]
         for fn in filenames:
-            if fn.endswith(".py"):
-                yield os.path.join(dirpath, fn)
+            if not fn.endswith(".py"):
+                continue
+            if not include_tests and _is_test_file(fn):
+                continue
+            yield os.path.join(dirpath, fn)
 
 
 # --- usage classification -------------------------------------------------
