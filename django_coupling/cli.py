@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import sys
+from collections import Counter, defaultdict
 
 from .classify import distance_score, volatility_score
 from .config import load_config
@@ -49,6 +50,37 @@ def analyze(target: str, since: str = "6 months ago", max_commit_files: int = 30
     highs = sum(1 for r in results if r["severity"] == "high")
     god = find_god_classes(target, min_methods=god_min_methods,
                            include_tests=include_tests, exclude_dirs=exclude_dirs)
+
+    # per-module rollup: aggregate the flat edge list by source file so the
+    # "this file depends on many far things" signal is readable without the
+    # consumer grouping edges themselves.
+    efferent = defaultdict(int)
+    afferent = defaultdict(int)
+    dist_sum = defaultdict(float)
+    target_pkgs = defaultdict(set)
+    for r in results:
+        efferent[r["src"]] += 1
+        afferent[r["tgt"]] += 1
+        dist_sum[r["src"]] += r["distance"]
+        target_pkgs[r["src"]].add(r["tgt"].rsplit(".", 1)[0])
+    god_per_module = Counter(g["module"] for g in god)
+    module_summary = []
+    for mod in modules:
+        ne = efferent.get(mod, 0)
+        na = afferent.get(mod, 0)
+        ng = god_per_module.get(mod, 0)
+        if ne == 0 and na == 0 and ng == 0:
+            continue  # isolated leaf with nothing to report
+        module_summary.append({
+            "module": mod,
+            "efferent_edges": ne,
+            "afferent_edges": na,
+            "distinct_target_packages": len(target_pkgs.get(mod, ())),
+            "mean_distance": round(dist_sum[mod] / ne, 3) if ne else 0.0,
+            "god_candidates": ng,
+        })
+    module_summary.sort(key=lambda m: (-m["efferent_edges"],
+                                       -m["distinct_target_packages"]))
     return {
         "target": os.path.abspath(target),
         "config": config_path,
@@ -63,6 +95,7 @@ def analyze(target: str, since: str = "6 months ago", max_commit_files: int = 30
         "highs": highs,
         "edges": results,
         "god_candidates": god,
+        "module_summary": module_summary,
     }
 
 
@@ -127,6 +160,19 @@ def _render_text(rep: dict, top: int) -> str:
             f"volatility={e['volatility']:.2f} ({e['volatility_label']})"
             f"   {e['src']} -> {e['tgt']}"
         )
+
+    ms = rep.get("module_summary", [])
+    if ms:
+        lines.append("")
+        lines.append(f"Modules by outgoing coupling (efferent, top {top}):")
+        for m in ms[:top]:
+            lines.append(
+                f"  efferent edges={m['efferent_edges']}  "
+                f"afferent edges={m['afferent_edges']}  "
+                f"distinct target packages={m['distinct_target_packages']}  "
+                f"mean distance={m['mean_distance']:.2f}  "
+                f"God candidates={m['god_candidates']}   {m['module']}"
+            )
     return "\n".join(lines)
 
 

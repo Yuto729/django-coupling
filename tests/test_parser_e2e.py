@@ -78,6 +78,19 @@ def test_tests_excluded_by_default(tmp_path):
     assert "api.services.budget" in modules
 
 
+def test_module_summary_aggregates_edges(tmp_path):
+    target = _make_project(tmp_path)
+    rep = analyze(target)
+    by_mod = {m["module"]: m for m in rep["module_summary"]}
+    # services.budget imports models.budget (1 out) and is imported by views.budget (1 in)
+    sb = by_mod["api.services.budget"]
+    assert sb["efferent_edges"] == 1
+    assert sb["afferent_edges"] == 1
+    # models.budget is a pure dependency target: 0 out, 1 in
+    assert by_mod["api.models.budget"]["efferent_edges"] == 0
+    assert by_mod["api.models.budget"]["afferent_edges"] == 1
+
+
 def test_analyze_flags_layer_violation(tmp_path):
     target = _make_project(tmp_path)
     rep = analyze(target)

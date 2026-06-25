@@ -95,6 +95,27 @@ too polluted by large AI-era commits to trust here).
 
 > On smbkikan-back the gates take it from 314 raw → 34 actionable candidates.
 
+## Module summary (per-file rollup)
+
+Beyond per-edge data, the report aggregates the edge list by source file so the
+"this file depends on many far, scattered things" signal is readable directly
+(no need for the consumer to group edges):
+
+```
+Modules by outgoing coupling (efferent, top N):
+  efferent edges=31  afferent edges=1  distinct target packages=11  mean distance=0.50  God candidates=0   api.views.shop
+```
+
+- **efferent edges** — outgoing dependencies (how many modules this file uses)
+- **afferent edges** — incoming dependencies (how many depend on this file)
+- **distinct target packages** — how many different packages it reaches into
+- **mean distance** — average coupling distance of its outgoing edges
+- **God candidates** — God-class candidates living in this file
+
+A file with high efferent + many distinct packages + multiple God candidates is
+a split candidate (move classes nearer to what they use). Note: re-export
+`__init__.py` aggregators legitimately show high afferent/efferent — not a smell.
+
 ## Usage
 
 ```bash
