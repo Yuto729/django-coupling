@@ -5,11 +5,27 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "django-coupling"
 version = "0.1.0"
-description = "Coupling analysis for Django/Python projects — Strength x Distance x Volatility (a la cargo-coupling)"
+description = "Static coupling-analysis CLI for Django/Python projects (Strength x Distance x Volatility) — NOT a Django app"
 readme = "README.md"
 requires-python = ">=3.11"
-# v0 goal: zero runtime dependencies. Pure stdlib (ast, subprocess, json, argparse, tomllib).
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Yuto Mitomi" }]
+keywords = ["coupling", "static-analysis", "django", "architecture", "code-quality"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Quality Assurance",
+]
+# zero runtime dependencies. Pure stdlib (ast, subprocess, json, argparse, tomllib).
+# `git` is invoked at runtime for the volatility signal (optional).
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Yuto729/django-coupling"
+Repository = "https://github.com/Yuto729/django-coupling"
 
 [project.scripts]
 django-coupling = "django_coupling.cli:main"
