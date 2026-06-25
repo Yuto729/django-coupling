@@ -153,6 +153,20 @@ django-coupling path/to/package --top 30 --since "3 months ago"
 
 Zero runtime dependencies (stdlib `ast` + `git`).
 
+### For AI agents
+
+A neutral reference skill for AI coding agents (when to use it, the help command,
+and how to interpret the output) lives at
+[`.claude/skills/django-coupling/SKILL.md`](.claude/skills/django-coupling/SKILL.md).
+Copy it into your project's `.claude/skills/` to make it available to Claude Code:
+
+```bash
+git clone https://github.com/Yuto729/django-coupling /tmp/django-coupling
+mkdir -p .claude/skills
+cp -r /tmp/django-coupling/.claude/skills/django-coupling .claude/skills/
+rm -rf /tmp/django-coupling   # optional cleanup
+```
+
 ## v0 scope & known limits
 
 This is an MVP (v0). It intentionally does **not** do:
