@@ -107,10 +107,13 @@ def _render_text(rep: dict, top: int) -> str:
         lines.append("  (cohesion components = LCOM4; >=2 means the class splits into "
                      "unrelated method clusters)")
         for g in god[:top]:
+            same_file = (f"  (this file has {g['module_god_count']} God candidates)"
+                         if g["module_god_count"] >= 2 else "")
             lines.append(
-                f"  [{g['severity']:<6}] cohesion components={g['lcom4']}  "
-                f"methods={g['methods']}  instance fields={g['fields']}  "
-                f"distinct imports used={g['fan_out']}   {g['class']}"
+                f"  [{g['severity']:<6}] cohesion components={g['cohesion_components']}  "
+                f"methods={g['methods']}  instance fields={g['instance_fields']}  "
+                f"distinct imports used={g['distinct_imports_used']}   "
+                f"{g['module']}.{g['class_name']}{same_file}"
             )
         lines.append("")
 

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import ast
 import os
+from collections import Counter
 
 from .parser import discover_project_root, iter_py_files, module_name
 
@@ -156,12 +157,18 @@ def find_god_classes(target: str, min_methods: int = DEFAULT_MIN_METHODS,
             fan = _fan_out(node, bound)
             severity = "high" if (components >= 3 or fan >= 10) else "medium"
             results.append({
-                "class": f"{mod}.{node.name}",
+                "module": mod,
+                "class_name": node.name,
                 "methods": len(methods),
-                "fields": len(fields),
-                "lcom4": components,
-                "fan_out": fan,
+                "instance_fields": len(fields),
+                "cohesion_components": components,   # LCOM4
+                "distinct_imports_used": fan,        # class-level efferent fan-out
                 "severity": severity,
             })
-    results.sort(key=lambda r: (r["severity"] != "high", -r["lcom4"], -r["methods"]))
+    # annotate how many God candidates live in the same file (a split signal)
+    per_module = Counter(r["module"] for r in results)
+    for r in results:
+        r["module_god_count"] = per_module[r["module"]]
+    results.sort(key=lambda r: (r["severity"] != "high",
+                                -r["cohesion_components"], -r["methods"]))
     return results

@@ -69,8 +69,33 @@ def test_find_god_classes_e2e(tmp_path):
         "    def f(self): return self.z\n"
     )
     god = find_god_classes(str(tmp_path / "proj" / "api"))
-    names = {g["class"] for g in god}
-    assert "api.services.bad.Big" in names
-    assert "api.services.ok.Good" not in names  # cohesive -> not flagged
-    big = next(g for g in god if g["class"] == "api.services.bad.Big")
-    assert big["lcom4"] == 3 and big["methods"] == 6
+    names = {(g["module"], g["class_name"]) for g in god}
+    assert ("api.services.bad", "Big") in names
+    assert ("api.services.ok", "Good") not in names  # cohesive -> not flagged
+    big = next(g for g in god
+               if g["module"] == "api.services.bad" and g["class_name"] == "Big")
+    assert big["cohesion_components"] == 3 and big["methods"] == 6
+    assert big["module_god_count"] == 1
+
+
+def test_module_god_count_flags_multiple_in_one_file(tmp_path):
+    root = tmp_path / "proj" / "api"
+    root.mkdir(parents=True)
+    (root / "__init__.py").write_text("")
+    # one file with TWO god classes (each splits into 2+ field clusters)
+    (root / "dense.py").write_text(
+        "class A:\n"
+        "    def a1(self): self.x = 1\n"
+        "    def a2(self): return self.x\n"
+        "    def a3(self): self.y = 2\n"
+        "    def a4(self): return self.y\n"
+        "class B:\n"
+        "    def b1(self): self.p = 1\n"
+        "    def b2(self): return self.p\n"
+        "    def b3(self): self.q = 2\n"
+        "    def b4(self): return self.q\n"
+    )
+    god = find_god_classes(str(root))
+    dense = [g for g in god if g["module"] == "api.dense"]
+    assert {g["class_name"] for g in dense} == {"A", "B"}
+    assert all(g["module_god_count"] == 2 for g in dense)
