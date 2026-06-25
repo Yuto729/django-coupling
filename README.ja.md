@@ -145,6 +145,13 @@ django-coupling path/to/package --top 30 --since "3 months ago"
 
 ランタイム依存ゼロ（stdlib `ast` + `git`）。
 
+### AI エージェント向け
+
+AI コーディングエージェント用の中立なリファレンス Skill（いつ使うか・ヘルプコマンド・
+出力の解釈方法）を
+[`.claude/skills/django-coupling/SKILL.md`](.claude/skills/django-coupling/SKILL.md)
+に同梱している。自分のプロジェクトの `.claude/skills/` にコピーすると Claude Code で使える。
+
 ## v0 のスコープと既知の限界
 
 これは MVP（v0）。意図的に**やっていない**こと：
