@@ -70,23 +70,24 @@ def _render_text(rep: dict, top: int) -> str:
     lines = []
     lines.append(f"django-coupling  {rep['target']}")
     lines.append("=" * 60)
-    lines.append(f"Grade: {rep['grade']}   avg balance: {rep['avg_balance']:.3f}")
-    lines.append(f"modules: {rep['module_count']}   edges: {rep['edge_count']}"
-                 f"   critical: {rep['criticals']}   high: {rep['highs']}")
+    lines.append(f"Grade: {rep['grade']}   average balance score: {rep['avg_balance']:.3f}")
+    lines.append(f"modules: {rep['module_count']}   dependency edges: {rep['edge_count']}"
+                 f"   critical issues: {rep['criticals']}   high issues: {rep['highs']}")
     if not rep["git_available"]:
         lines.append("(!) git history unavailable — volatility defaulted to 0")
     else:
         d = rep["volatility_diagnostics"]
         lines.append(
             f"volatility confidence: {d['confidence']}  "
-            f"(median {d['median_files']} files/commit, p90 {d['p90_files']}, "
-            f"{d['excluded_bulk']}/{d['commits']} bulk commits >"
-            f"{d['max_commit_files']} excluded)"
+            f"(median {d['median_files']} files per commit, "
+            f"90th percentile {d['p90_files']}, "
+            f"{d['excluded_bulk']} of {d['commits']} bulk commits "
+            f"(over {d['max_commit_files']} files) excluded)"
         )
     if rep.get("config"):
-        lines.append(f"config: {rep['config']}  layers={rep['layer_rank']}")
+        lines.append(f"config: {rep['config']}   layer ranks: {rep['layer_rank']}")
     else:
-        lines.append(f"config: (defaults)  layers={rep['layer_rank']}")
+        lines.append(f"config: (defaults)   layer ranks: {rep['layer_rank']}")
     lines.append("")
 
     issues = [e for e in rep["edges"] if e["severity"]]
@@ -96,28 +97,32 @@ def _render_text(rep: dict, top: int) -> str:
         for e in issues[:top]:
             lines.append(
                 f"  [{e['severity']:<8}] {e['issue']:<16} "
-                f"{e['src']} -> {e['tgt']}  (bal={e['balance']:.2f})"
+                f"{e['src']} -> {e['tgt']}   (balance score {e['balance']:.2f})"
             )
         lines.append("")
 
     god = rep.get("god_candidates", [])
     if god:
         lines.append(f"God class candidates ({len(god)}, cohesion-based — review, not a verdict):")
+        lines.append("  (cohesion components = LCOM4; >=2 means the class splits into "
+                     "unrelated method clusters)")
         for g in god[:top]:
             lines.append(
-                f"  [{g['severity']:<6}] lcom4={g['lcom4']} methods={g['methods']}"
-                f" fields={g['fields']} fan_out={g['fan_out']}  {g['class']}"
+                f"  [{g['severity']:<6}] cohesion components={g['lcom4']}  "
+                f"methods={g['methods']}  instance fields={g['fields']}  "
+                f"distinct imports used={g['fan_out']}   {g['class']}"
             )
         lines.append("")
 
     worst = sorted(rep["edges"], key=lambda e: e["balance"])[:top]
-    lines.append(f"Hotspots (lowest balance, top {top}):")
+    lines.append(f"Hotspots (lowest balance score, top {top}):")
     for e in worst:
         lines.append(
-            f"  bal={e['balance']:.2f}  S={e['strength']:.2f}({e['strength_label']})"
-            f" D={e['distance']:.2f}({e['distance_label']})"
-            f" V={e['volatility']:.2f}({e['volatility_label']})"
-            f"  {e['src']} -> {e['tgt']}"
+            f"  balance score={e['balance']:.2f}  "
+            f"strength={e['strength']:.2f} ({e['strength_label']})  "
+            f"distance={e['distance']:.2f} ({e['distance_label']})  "
+            f"volatility={e['volatility']:.2f} ({e['volatility_label']})"
+            f"   {e['src']} -> {e['tgt']}"
         )
     return "\n".join(lines)
 
