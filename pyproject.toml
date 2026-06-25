@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "django-coupling"
+version = "0.1.0"
+description = "Coupling analysis for Django/Python projects — Strength x Distance x Volatility (a la cargo-coupling)"
+readme = "README.md"
+requires-python = ">=3.11"
+# v0 goal: zero runtime dependencies. Pure stdlib (ast, subprocess, json, argparse, tomllib).
+dependencies = []
+
+[project.scripts]
+django-coupling = "django_coupling.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["django_coupling*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
