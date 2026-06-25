@@ -125,11 +125,12 @@ def _fan_out(classnode: ast.ClassDef, bound: set[str]) -> int:
     return len(used)
 
 
-def find_god_classes(target: str, min_methods: int = DEFAULT_MIN_METHODS) -> list[dict]:
+def find_god_classes(target: str, min_methods: int = DEFAULT_MIN_METHODS,
+                     include_tests: bool = False, exclude_dirs=None) -> list[dict]:
     """Return God-class candidates, strongest first."""
     root = discover_project_root(target)
     results = []
-    for path in iter_py_files(target):
+    for path in iter_py_files(target, include_tests=include_tests, exclude_dirs=exclude_dirs):
         try:
             with open(path, encoding="utf-8") as fh:
                 tree = ast.parse(fh.read(), filename=path)

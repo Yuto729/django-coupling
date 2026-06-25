@@ -43,6 +43,12 @@ views = 0
 serializers = 2   # same rank as services: services <-> serializers is NOT a violation
 services = 2
 models = 3
+
+[analysis]
+# extra directory names to skip, on top of the built-ins
+# (__pycache__, migrations, node_modules, venv, .venv, tests/test)
+exclude_dirs = ["seeds_csv", "seeds_json", "generated"]
+include_tests = false   # true to analyze test files too
 ```
 
 > On smbkikan-back, putting `serializers` and `services` at the same rank drops

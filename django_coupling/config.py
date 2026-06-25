@@ -1,6 +1,6 @@
 """Project configuration via `.coupling.toml`.
 
-Discovered by walking up from the analysis target. v0 supports one section:
+Discovered by walking up from the analysis target. Supported sections:
 
     [layers]
     # name = rank   (smaller rank = higher layer)
@@ -8,6 +8,12 @@ Discovered by walking up from the analysis target. v0 supports one section:
     serializers = 2   # same rank as services -> services<->serializers is same-layer
     services = 2
     models = 3
+
+    [analysis]
+    # directory names to skip during file discovery, on top of the built-in set
+    # (__pycache__, migrations, node_modules, venv, .venv, tests/test)
+    exclude_dirs = ["seeds_csv", "seeds_json", "generated"]
+    include_tests = false   # set true to analyze test files too
 
 Read-only TOML via stdlib `tomllib` (Python 3.11+); zero third-party deps.
 """
@@ -36,21 +42,42 @@ def find_config(target: str) -> str | None:
         cur = parent
 
 
-def load_layer_rank(target: str) -> tuple[dict, str | None]:
-    """Return (layer_rank, config_path). Falls back to defaults if absent/invalid."""
+def load_config(target: str) -> dict:
+    """Load full config. Keys: layer_rank, exclude_dirs, include_tests, path."""
+    cfg = {
+        "layer_rank": dict(DEFAULT_LAYER_RANK),
+        "exclude_dirs": set(),
+        "include_tests": False,
+        "path": None,
+    }
     path = find_config(target)
     if path is None:
-        return dict(DEFAULT_LAYER_RANK), None
+        return cfg
+    cfg["path"] = path
     try:
         with open(path, "rb") as fh:
             data = tomllib.load(fh)
     except (OSError, tomllib.TOMLDecodeError):
-        return dict(DEFAULT_LAYER_RANK), None
+        cfg["path"] = None
+        return cfg
 
     layers = data.get("layers")
-    if not isinstance(layers, dict) or not layers:
-        return dict(DEFAULT_LAYER_RANK), path
-    rank = {name: int(r) for name, r in layers.items() if isinstance(r, int)}
-    if not rank:
-        return dict(DEFAULT_LAYER_RANK), path
-    return rank, path
+    if isinstance(layers, dict) and layers:
+        rank = {name: int(r) for name, r in layers.items() if isinstance(r, int)}
+        if rank:
+            cfg["layer_rank"] = rank
+
+    analysis = data.get("analysis")
+    if isinstance(analysis, dict):
+        excl = analysis.get("exclude_dirs")
+        if isinstance(excl, list):
+            cfg["exclude_dirs"] = {str(d) for d in excl if isinstance(d, str)}
+        if isinstance(analysis.get("include_tests"), bool):
+            cfg["include_tests"] = analysis["include_tests"]
+    return cfg
+
+
+def load_layer_rank(target: str) -> tuple[dict, str | None]:
+    """Backward-compatible helper: (layer_rank, config_path)."""
+    cfg = load_config(target)
+    return cfg["layer_rank"], cfg["path"]

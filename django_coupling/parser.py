@@ -42,11 +42,13 @@ def _is_test_file(fn: str) -> bool:
             or fn in {"conftest.py", "tests.py"})
 
 
-def iter_py_files(target: str, include_tests: bool = False):
+def iter_py_files(target: str, include_tests: bool = False, exclude_dirs=None):
+    extra = set(exclude_dirs or ())
     for dirpath, dirnames, filenames in os.walk(target):
         # skip virtualenvs, migrations, caches, hidden dirs (and tests by default,
-        # matching cargo-coupling: test->internal coupling is expected, not a smell)
-        skip_dirs = {"__pycache__", "migrations", "node_modules", "venv", ".venv"}
+        # matching cargo-coupling: test->internal coupling is expected, not a smell).
+        # `exclude_dirs` from .coupling.toml [analysis] adds project-specific dirs.
+        skip_dirs = {"__pycache__", "migrations", "node_modules", "venv", ".venv"} | extra
         if not include_tests:
             skip_dirs |= {"tests", "test"}
         dirnames[:] = [
@@ -178,14 +180,14 @@ def _resolve_imports(tree: ast.AST, current_module: str, is_package: bool,
 
 
 # --- public API -----------------------------------------------------------
-def build_graph(target: str):
+def build_graph(target: str, include_tests: bool = False, exclude_dirs=None):
     """Parse `target` and return (modules, edges).
 
     modules: dict module_name -> relative file path
     edges:   list of dicts {src, tgt, strength, strength_label}
     """
     root = discover_project_root(target)
-    files = list(iter_py_files(target))
+    files = list(iter_py_files(target, include_tests=include_tests, exclude_dirs=exclude_dirs))
     modules = {module_name(f, root): f for f in files}
     internal = set(modules)
 

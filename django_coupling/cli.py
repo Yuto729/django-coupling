@@ -7,7 +7,7 @@ import os
 import sys
 
 from .classify import distance_score, volatility_score
-from .config import load_layer_rank
+from .config import load_config
 from .godclass import DEFAULT_MIN_METHODS, find_god_classes
 from .parser import build_graph
 from .score import balance_score, detect_issue, grade
@@ -16,11 +16,15 @@ from .volatility import commit_counts
 
 def analyze(target: str, since: str = "6 months ago", max_commit_files: int = 30,
             god_min_methods: int = DEFAULT_MIN_METHODS) -> dict:
-    modules, edges = build_graph(target)
+    cfg = load_config(target)
+    layer_rank, config_path = cfg["layer_rank"], cfg["path"]
+    exclude_dirs, include_tests = cfg["exclude_dirs"], cfg["include_tests"]
+
+    modules, edges = build_graph(target, include_tests=include_tests,
+                                 exclude_dirs=exclude_dirs)
     abspaths = {mod: os.path.abspath(path) for mod, path in modules.items()}
     counts, vol_diag = commit_counts(target, since=since, max_files=max_commit_files)
     git_available = vol_diag is not None
-    layer_rank, config_path = load_layer_rank(target)
 
     results = []
     for e in edges:
@@ -43,7 +47,8 @@ def analyze(target: str, since: str = "6 months ago", max_commit_files: int = 30
     avg = round(sum(r["balance"] for r in results) / len(results), 4) if results else 1.0
     criticals = sum(1 for r in results if r["severity"] == "critical")
     highs = sum(1 for r in results if r["severity"] == "high")
-    god = find_god_classes(target, min_methods=god_min_methods)
+    god = find_god_classes(target, min_methods=god_min_methods,
+                           include_tests=include_tests, exclude_dirs=exclude_dirs)
     return {
         "target": os.path.abspath(target),
         "config": config_path,
