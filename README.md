@@ -1,5 +1,7 @@
 # django-coupling
 
+**English** | [日本語](README.ja.md)
+
 Coupling analysis for Django / Python projects — a Python take on
 [`cargo-coupling`](https://github.com/nwiizo/cargo-coupling), based on Vlad
 Khononov's *Balancing Coupling in Software Design*.
