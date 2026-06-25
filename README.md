@@ -4,6 +4,9 @@ Coupling analysis for Django / Python projects — a Python take on
 [`cargo-coupling`](https://github.com/nwiizo/cargo-coupling), based on Vlad
 Khononov's *Balancing Coupling in Software Design*.
 
+> **This is a static-analysis CLI you run *against* a Django project — not an
+> installable Django app.** You don't add it to `INSTALLED_APPS`.
+
 The premise: **coupling is not inherently bad — unbalanced coupling is.** Strong
 coupling is fine when the things are close or stable; it hurts when it is strong
 *and* far, or strong *and* volatile. The tool externalizes that judgment into a
@@ -116,6 +119,28 @@ A file with high efferent + many distinct packages + multiple God candidates is
 a split candidate (move classes nearer to what they use). Note: re-export
 `__init__.py` aggregators legitimately show high afferent/efferent — not a smell.
 
+## Install (Nix)
+
+Distributed as a Nix flake (`git` is wrapped in, so the volatility signal works
+out of the box).
+
+```bash
+# run without installing, from a local clone
+nix run . -- path/to/project
+
+# install into your profile
+nix profile install .
+
+# once the repo is public, run straight from GitHub
+nix run github:Yuto729/django-coupling -- path/to/project
+
+# dev shell (pytest + git)
+nix develop
+```
+
+Not using Nix? It's a zero-dependency stdlib package, so `pipx install .` /
+`uvx --from . django-coupling` from a clone also work.
+
 ## Usage
 
 ```bash
@@ -153,4 +178,23 @@ Results are guidance, not verdicts — a starting point for human review.
 ```bash
 python -m venv .venv && .venv/bin/pip install pytest
 .venv/bin/python -m pytest -q
+# or, with Nix:
+nix develop -c pytest -q
 ```
+
+## Credits
+
+- Port of [`cargo-coupling`](https://github.com/nwiizo/cargo-coupling) by
+  [@nwiizo](https://github.com/nwiizo) — the Rust tool this reimplements for
+  Python/Django. The three-dimensional model (Strength × Distance × Volatility)
+  and the Balance Score formula follow it directly. See also the author's write-ups:
+  [introduction](https://syu-m-5151.hatenablog.com/entry/2025/12/20/195329) /
+  [visualizing coupling](https://syu-m-5151.hatenablog.com/entry/2025/12/21/152559).
+- Based on Vlad Khononov, *Balancing Coupling in Software Design* (Addison-Wesley)
+  — the Integration Strength / Distance / Volatility framework.
+- "Django" is a registered trademark of the Django Software Foundation. This is
+  an unofficial, third-party tool and is not affiliated with or endorsed by the DSF.
+
+## License
+
+[MIT](LICENSE) © Yuto Mitomi
