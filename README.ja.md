@@ -145,6 +145,27 @@ django-coupling path/to/package --top 30 --since "3 months ago"
 
 ランタイム依存ゼロ（stdlib `ast` + `git`）。
 
+### 差分モード（変更ファイルの悪化を見る）
+
+絶対値は「このコードベースはどれだけ結合しているか」を答える。`--diff` はより
+行動につながる **「自分の変更がどれだけ悪化させたか」** を答える。各変更ファイルの
+*before*（`git show <ref>:file`）と *after*（作業ツリー）を比較し、**変更ファイルだけ**を
+パースする（全体のベース集計は回さない）。
+
+```bash
+django-coupling path/to/package --diff           # 作業ツリー vs HEAD
+django-coupling path/to/package --diff main       # ブランチ/コミットと比較
+django-coupling path/to/package --diff --json     # 機械可読
+```
+
+変更ファイルに限定して報告する：**新規 issue**（レイヤー違反・cascading）、
+**balance のリグレッション**（エッジの balance 低下）、**新規/悪化した God 候補**、
+および変更スコープの balance before → after。**新規 critical が入ると exit 1** —— 既存の
+バックログを直さなくても *新規* 違反だけをブロックする CI ratchet として使える。
+
+スコープ：変更ファイルから**出ていくエッジ**のみ。変更していない importer への二次波及
+（変更ファイルの volatility 上昇、あるいはレイヤーをまたぐ**移動**）は意図的に対象外。
+
 ### AI エージェント向け
 
 AI コーディングエージェント用の中立なリファレンス Skill（いつ使うか・ヘルプコマンド・

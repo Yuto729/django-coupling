@@ -57,6 +57,29 @@ options:
 Prefer `--json` for programmatic consumption; it contains the full edge list and
 all metrics. The text output shows only the top-N rows per section.
 
+### Diff mode: `--diff [<ref>]`
+
+Reports coupling *regressions attributable to changed files* rather than the
+absolute state. Use it to answer "did this change/branch make coupling worse".
+
+```bash
+django-coupling <path> --diff            # working tree vs HEAD
+django-coupling <path> --diff main       # vs a branch/commit
+django-coupling <path> --diff --json     # machine-readable delta
+```
+
+- Compares each changed file's before (`git show`) vs after (working tree);
+  parses only changed files (no whole-project run).
+- Output keys: `base`, `changed_files`, `new_critical`, `new_high`,
+  `new_issues[]`, `regressions[]` (each with `balance_before`), `god_changes[]`
+  (`change`: `new`|`worsened`), `balance_before`/`balance_after` (changed scope).
+- **Exit code 1 if any new critical issue** — use as a CI ratchet (blocks *new*
+  violations without requiring the existing backlog be fixed).
+- Scope limit: only edges *originating from* changed files. It does NOT report
+  second-order effects on unchanged importers (a changed file becoming more
+  volatile, or being moved across a layer). Treat a clean `--diff` as "this
+  change added no new outgoing-coupling regressions", not "no effect anywhere".
+
 ## The scoring model
 
 Each dependency edge `A -> B` (A imports/uses B) gets three 0.0–1.0 scores:
