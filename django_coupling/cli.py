@@ -9,6 +9,7 @@ from collections import Counter, defaultdict
 
 from .classify import distance_score, volatility_score
 from .config import load_config
+from .diffmode import analyze_diff
 from .godclass import DEFAULT_MIN_METHODS, find_god_classes
 from .parser import build_graph
 from .score import balance_score, detect_issue, grade
@@ -176,6 +177,46 @@ def _render_text(rep: dict, top: int) -> str:
     return "\n".join(lines)
 
 
+def _render_diff_text(rep: dict, top: int) -> str:
+    lines = [f"django-coupling --diff (vs {rep['base']})",
+             "=" * 60,
+             f"changed files: {rep['changed_files']}   "
+             f"new critical: {rep['new_critical']}   new high: {rep['new_high']}"]
+    if rep["balance_before"] is not None:
+        delta = rep["balance_after"] - rep["balance_before"]
+        arrow = "worse" if delta < 0 else ("better" if delta > 0 else "same")
+        lines.append(f"changed-scope balance: {rep['balance_before']:.3f} -> "
+                     f"{rep['balance_after']:.3f} ({arrow} by {abs(delta):.3f})")
+    lines.append("")
+
+    if rep["new_issues"]:
+        lines.append(f"NEW issues introduced ({len(rep['new_issues'])}):")
+        for e in sorted(rep["new_issues"], key=lambda x: x["severity"] != "critical"):
+            lines.append(f"  [{e['severity']:<8}] {e['issue']:<16} {e['src']} -> {e['tgt']}")
+        lines.append("")
+
+    if rep["regressions"]:
+        lines.append(f"Balance regressions ({len(rep['regressions'])}):")
+        for e in rep["regressions"][:top]:
+            lines.append(f"  {e['balance_before']:.2f} -> {e['balance']:.2f}  "
+                         f"{e['src']} -> {e['tgt']}  "
+                         f"(strength {e['strength_label']}, distance {e['distance_label']})")
+        lines.append("")
+
+    if rep["god_changes"]:
+        lines.append(f"New / worsened God candidates ({len(rep['god_changes'])}):")
+        for g in rep["god_changes"][:top]:
+            detail = (f"cohesion components {g['components_before']} -> {g['cohesion_components']}"
+                      if g["change"] == "worsened"
+                      else f"cohesion components={g['cohesion_components']}")
+            lines.append(f"  [{g['change']:<8}] {g['module']}.{g['class_name']}  ({detail})")
+        lines.append("")
+
+    if not (rep["new_issues"] or rep["regressions"] or rep["god_changes"]):
+        lines.append("No coupling regressions in the changed files.")
+    return "\n".join(lines)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="django-coupling")
     ap.add_argument("path", help="package/directory to analyze")
@@ -186,11 +227,24 @@ def main(argv=None) -> int:
                     help="exclude commits touching more than N files from volatility (default 30)")
     ap.add_argument("--god-min-methods", type=int, default=4,
                     help="min instance methods for a class to be a God candidate (default 4)")
+    ap.add_argument("--diff", nargs="?", const="", default=None, metavar="REF",
+                    help="diff mode: report coupling regressions only in files changed "
+                         "vs REF (default: working tree vs HEAD). Exit 1 on new critical issues.")
     args = ap.parse_args(argv)
 
     if not os.path.isdir(args.path):
         print(f"error: not a directory: {args.path}", file=sys.stderr)
         return 2
+
+    if args.diff is not None:
+        ref = args.diff or None  # "" -> working tree vs HEAD
+        rep = analyze_diff(args.path, ref=ref)
+        if "error" in rep:
+            print(f"error: {rep['error']}", file=sys.stderr)
+            return 2
+        print(json.dumps(rep, indent=2, ensure_ascii=False) if args.json
+              else _render_diff_text(rep, args.top))
+        return 1 if rep["new_critical"] > 0 else 0
 
     rep = analyze(args.path, since=args.since, max_commit_files=args.max_commit_files,
                   god_min_methods=args.god_min_methods)

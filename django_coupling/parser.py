@@ -180,6 +180,28 @@ def _resolve_imports(tree: ast.AST, current_module: str, is_package: bool,
 
 
 # --- public API -----------------------------------------------------------
+def edges_from_tree(mod: str, tree, internal: set, is_package: bool) -> list[dict]:
+    """Outgoing internal edges for a single module's AST.
+
+    Returns [{src, tgt, strength, strength_label}]. Used both by build_graph
+    (whole project) and by diff mode (one changed file at a time).
+    """
+    if tree is None:
+        return []
+    bound = _resolve_imports(tree, mod, is_package, internal)
+    if not bound:
+        return []
+    visitor = _UsageVisitor(bound)
+    visitor.visit(tree)
+    out = []
+    for tgt, kinds in visitor.kinds.items():
+        if tgt == mod:
+            continue  # ignore self-references
+        score, label = strength_from_usages(kinds)
+        out.append({"src": mod, "tgt": tgt, "strength": score, "strength_label": label})
+    return out
+
+
 def build_graph(target: str, include_tests: bool = False, exclude_dirs=None):
     """Parse `target` and return (modules, edges).
 
@@ -199,14 +221,5 @@ def build_graph(target: str, include_tests: bool = False, exclude_dirs=None):
         except (SyntaxError, UnicodeDecodeError):
             continue
         is_package = path.endswith(os.sep + "__init__.py") or path.endswith("/__init__.py")
-        bound = _resolve_imports(tree, mod, is_package, internal)
-        if not bound:
-            continue
-        visitor = _UsageVisitor(bound)
-        visitor.visit(tree)
-        for tgt, kinds in visitor.kinds.items():
-            if tgt == mod:
-                continue  # ignore self-references
-            score, label = strength_from_usages(kinds)
-            edges.append({"src": mod, "tgt": tgt, "strength": score, "strength_label": label})
+        edges.extend(edges_from_tree(mod, tree, internal, is_package))
     return modules, edges

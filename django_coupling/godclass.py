@@ -126,6 +126,44 @@ def _fan_out(classnode: ast.ClassDef, bound: set[str]) -> int:
     return len(used)
 
 
+def god_in_tree(mod: str, tree, min_methods: int = DEFAULT_MIN_METHODS) -> list[dict]:
+    """God-class candidates in a single module's AST (no module_god_count).
+
+    Used both by find_god_classes (whole project) and diff mode (one file).
+    """
+    if tree is None:
+        return []
+    bound = _bound_import_names(tree)
+    out = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        methods = _instance_methods(node)
+        if len(methods) < min_methods:
+            continue
+        fields = _self_fields(node)
+        if not fields:
+            continue  # no shared state -> LCOM4 meaningless (framework/util bag)
+        components = lcom4(methods)
+        if components < 2:
+            continue  # cohesive -> not a candidate
+        # all-singletons (lcom4 == methods) is a stateless bag, not OO god-class
+        if components >= len(methods):
+            continue
+        fan = _fan_out(node, bound)
+        severity = "high" if (components >= 3 or fan >= 10) else "medium"
+        out.append({
+            "module": mod,
+            "class_name": node.name,
+            "methods": len(methods),
+            "instance_fields": len(fields),
+            "cohesion_components": components,   # LCOM4
+            "distinct_imports_used": fan,        # class-level efferent fan-out
+            "severity": severity,
+        })
+    return out
+
+
 def find_god_classes(target: str, min_methods: int = DEFAULT_MIN_METHODS,
                      include_tests: bool = False, exclude_dirs=None) -> list[dict]:
     """Return God-class candidates, strongest first."""
@@ -137,34 +175,7 @@ def find_god_classes(target: str, min_methods: int = DEFAULT_MIN_METHODS,
                 tree = ast.parse(fh.read(), filename=path)
         except (SyntaxError, UnicodeDecodeError):
             continue
-        bound = _bound_import_names(tree)
-        mod = module_name(path, root)
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.ClassDef):
-                continue
-            methods = _instance_methods(node)
-            if len(methods) < min_methods:
-                continue
-            fields = _self_fields(node)
-            if not fields:
-                continue  # no shared state -> LCOM4 meaningless (framework/util bag)
-            components = lcom4(methods)
-            if components < 2:
-                continue  # cohesive -> not a candidate
-            # all-singletons (lcom4 == methods) is a stateless bag, not OO god-class
-            if components >= len(methods):
-                continue
-            fan = _fan_out(node, bound)
-            severity = "high" if (components >= 3 or fan >= 10) else "medium"
-            results.append({
-                "module": mod,
-                "class_name": node.name,
-                "methods": len(methods),
-                "instance_fields": len(fields),
-                "cohesion_components": components,   # LCOM4
-                "distinct_imports_used": fan,        # class-level efferent fan-out
-                "severity": severity,
-            })
+        results.extend(god_in_tree(module_name(path, root), tree, min_methods))
     # annotate how many God candidates live in the same file (a split signal)
     per_module = Counter(r["module"] for r in results)
     for r in results:

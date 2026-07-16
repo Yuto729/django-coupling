@@ -153,6 +153,29 @@ django-coupling path/to/package --top 30 --since "3 months ago"
 
 Zero runtime dependencies (stdlib `ast` + `git`).
 
+### Diff mode (regressions in changed files)
+
+The absolute state answers "how coupled is this codebase"; `--diff` answers the
+more actionable question **"how much did *my change* worsen it?"** It compares
+each changed file's *before* (`git show <ref>:file`) and *after* (working tree),
+parsing only the changed files — no whole-project baseline run.
+
+```bash
+django-coupling path/to/package --diff           # working tree vs HEAD
+django-coupling path/to/package --diff main       # vs a branch/commit
+django-coupling path/to/package --diff --json     # machine-readable
+```
+
+Reports, scoped to changed files: **new issues** (layer violations, cascading
+risks), **balance regressions** (edge balance dropped), and **new/worsened God
+candidates**, plus the changed-scope balance before → after. **Exits 1 if a new
+critical issue was introduced** — usable as a CI ratchet that blocks *new*
+violations without demanding the existing backlog be fixed first.
+
+Scope: only edges *originating from* changed files. Second-order effects on
+unchanged importers (a changed file becoming more volatile, or being *moved*
+across a layer) are intentionally out of scope.
+
 ### For AI agents
 
 A neutral reference skill for AI coding agents (when to use it, the help command,
